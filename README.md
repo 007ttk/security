@@ -8,14 +8,14 @@ The package adds in security functions for the CMS, including sanitation and esc
 
 You can install the security package by running the following composer command.
 
-`composer require digitalshopfront/security`
+`composer require ArtisanPackUI/security`
 
 ## Usage
 
 You can use any of the security functions like this:
 
 ```
-use Digitalshopfront\Security\Facades\Security as Security;
+use ArtisanPackUI\Security\Facades\Security as Security;
 
 echo Security::escHtml('#38ed24');
 ```

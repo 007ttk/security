@@ -1,5 +1,9 @@
 # Digital Shopfront CMS Security Changelog
 
+## 1.0.3 - May 14, 2025
+
+- Changed the vendor name to ArtisanPack UI.
+
 ## 1.0.2 - April 21, 2025
 
 - Fixed an issue with running the `kses()` function.
