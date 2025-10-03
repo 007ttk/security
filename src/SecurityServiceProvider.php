@@ -59,15 +59,6 @@ class SecurityServiceProvider extends ServiceProvider
 	 */
 	protected function bootTwoFactorAuthentication(): void
 	{
-		// If the entire 2FA feature is disabled, do not register any of its components.
-		if ( ! config( 'security.enabled' ) ) {
-			return;
-		}
-
-		$this->loadRoutesFrom( __DIR__ . '/../routes/web.php' );
-
-		$this->loadViewsFrom( __DIR__ . '/../resources/views', 'artisanpack-ui-security' );
-
 		if ( $this->app->runningInConsole() ) {
 			if ( ! class_exists( 'AddTwoFactorToUsersTable' ) ) {
 				$this->publishes( [
@@ -80,10 +71,16 @@ class SecurityServiceProvider extends ServiceProvider
 							  ], 'artisanpack-ui-views' );
 		}
 
-		// Your runtime check for the route's existence can remain here.
-		if ( $this->app->isLocal() ) {
-			$this->ensureTwoFactorChallengeRouteExists();
+		// If the entire 2FA feature is disabled, do not register any of its components.
+		if ( ! config( 'security.enabled' ) ) {
+			return;
 		}
+
+		$this->loadRoutesFrom( __DIR__ . '/../routes/web.php' );
+
+		$this->loadViewsFrom( __DIR__ . '/../resources/views', 'artisanpack-ui-security' );
+
+		$this->ensureTwoFactorChallengeRouteExists();
 	}
 
 	/**
