@@ -3,7 +3,28 @@
 use ArtisanPackUI\Security\TwoFactor\Providers\EmailProvider;
 
 return [
+    /*
+     |--------------------------------------------------------------------------
+     | Enable Two-Factor Authentication
+     |--------------------------------------------------------------------------
+     |
+     | This option controls whether the two-factor authentication feature is
+     | enabled globally. When set to false, the package will not register
+     | its routes or middleware, effectively disabling the feature.
+     |
+     */
+    'enabled' => false,
 
+    /*
+     |--------------------------------------------------------------------------
+     | Middleware
+     |--------------------------------------------------------------------------
+     |
+     | This option controls the middleware that will be used for the routes.
+     | By default, the 'web' middleware is used.
+     |
+     */
+    'middleware' => 'web',
 	'routes' => [
 		/*
 		 * The route name where users will be redirected to enter their 2FA code.
