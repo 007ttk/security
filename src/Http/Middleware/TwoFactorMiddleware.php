@@ -25,6 +25,17 @@ use Illuminate\Http\Request;
 class TwoFactorMiddleware
 {
 	/**
+	 * The session key for tracking 2FA verification status.
+	 *
+	 * This key is used to store a boolean value in the session to indicate
+	 * that the user has successfully passed the two-factor challenge.
+	 *
+	 * @since 1.0.0
+	 * @var string
+	 */
+	public const SESSION_KEY = 'two_factor_verified';
+
+	/**
 	 * Handle an incoming request.
 	 *
 	 * @since 1.2.0
@@ -37,7 +48,12 @@ class TwoFactorMiddleware
 	{
 		$user = $request->user();
 
-		if ( $user && $user->hasTwoFactorEnabled() && ! $request->session()->get( 'two_factor_verified' ) ) {
+		if (
+			$user &&
+			method_exists( $user, 'hasTwoFactorEnabled' ) &&
+			$user->hasTwoFactorEnabled() &&
+			! $request->session()->get( self::SESSION_KEY )
+		) {
 			return redirect()->route( config( 'security.routes.verify' ) );
 		}
 
