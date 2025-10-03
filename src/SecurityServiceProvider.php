@@ -65,10 +65,6 @@ class SecurityServiceProvider extends ServiceProvider
 									  __DIR__ . '/../database/migrations/2025_09_28_205614_add_two_factor_to_users_table.php' => database_path( 'migrations/' . date( 'Y_m_d_His', time() ) . '_add_two_factor_to_users_table.php' ),
 								  ], 'artisanpack-ui-security-migrations' );
 			}
-
-			$this->publishes( [
-								  __DIR__ . '/../resources/views' => resource_path( 'views/vendor/artisanpack-ui-security' ),
-							  ], 'artisanpack-ui-views' );
 		}
 
 		// If the entire 2FA feature is disabled, do not register any of its components.
@@ -80,7 +76,15 @@ class SecurityServiceProvider extends ServiceProvider
 
 		$this->loadViewsFrom( __DIR__ . '/../resources/views', 'artisanpack-ui-security' );
 
-		$this->ensureTwoFactorChallengeRouteExists();
+		// Defer route check until routes are fully loaded
+		Route::matched( function () {
+			static $checked = false;
+			if ( ! $checked ) {
+				$this->ensureTwoFactorChallengeRouteExists();
+				$checked = true;
+			}
+		} );
+
 	}
 
 	/**
