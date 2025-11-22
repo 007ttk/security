@@ -2,8 +2,11 @@
 
 namespace ArtisanPackUI\Security;
 
+use ArtisanPackUI\Security\Console\Commands\CheckSessionSecurity;
+use ArtisanPackUI\Security\Http\Middleware\EnsureSessionIsEncrypted;
 use ArtisanPackUI\Security\TwoFactor\TwoFactorManager;
 use Exception;
+use Illuminate\Contracts\Http\Kernel;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 
@@ -31,7 +34,7 @@ class SecurityServiceProvider extends ServiceProvider
 	 * @since 1.0.0
 	 * @return void
 	 */
-	public function boot(): void
+	public function boot(Kernel $kernel): void
 	{
 		$this->mergeConfiguration();
 
@@ -39,9 +42,17 @@ class SecurityServiceProvider extends ServiceProvider
 
 		if ( $this->app->runningInConsole() ) {
 			$this->publishes( [
-								  __DIR__ . '/../config/security.php' => config_path( 'artisanpack/security.php' ),
-							  ], 'artisanpack-package-config' );
+				__DIR__ . '/../config/security.php' => config_path( 'artisanpack/security.php' ),
+			], 'artisanpack-package-config' );
+
+            $this->commands([
+                CheckSessionSecurity::class,
+            ]);
 		}
+
+        if (config('artisanpack.security.encrypt')) {
+            $kernel->pushMiddleware(EnsureSessionIsEncrypted::class);
+        }
 
 		$this->bootTwoFactorAuthentication();
 	}

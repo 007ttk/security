@@ -25,6 +25,20 @@ return [
      |
      */
     'middleware' => 'web',
+
+    /*
+    |--------------------------------------------------------------------------
+    | Enforce Session Encryption
+    |--------------------------------------------------------------------------
+    |
+    | This option determines whether the package should enforce that the
+    | application's session cookie is encrypted. When enabled, this
+    | package will verify that session encryption is not disabled
+    | in production environments.
+    |
+    */
+    'encrypt' => env('SESSION_ENCRYPT', true),
+
 	'routes' => [
 		/*
 		 * The route name where users will be redirected to enter their 2FA code.
