@@ -4,16 +4,16 @@ namespace ArtisanPackUI\Security\Http\Middleware;
 
 use Closure;
 use Illuminate\Http\Request;
-use Illuminate\Http\Response;
+use Symfony\Component\HttpFoundation\Response;
 
 class SecurityHeadersMiddleware
 {
-    public function handle(Request $request, Closure $next): Response
+    public function handle(Request $request, Closure $next): \Symfony\Component\HttpFoundation\Response
     {
-        /** @var Response $response */
+        /** @var \Symfony\Component\HttpFoundation\Response $response */
         $response = $next($request);
 
-        $headers = config('security.security-headers', []);
+        $headers = config('artisanpack.security.security-headers', []);
 
         foreach ($headers as $key => $value) {
             if ($value !== null && $value !== '') {

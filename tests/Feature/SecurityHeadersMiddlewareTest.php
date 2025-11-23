@@ -18,7 +18,7 @@ class SecurityHeadersMiddlewareTest extends TestCase
             'X-Content-Type-Options' => 'nosniff',
             'Content-Security-Policy' => "default-src 'none'",
         ];
-        Config::set('security.security-headers', $headers);
+        Config::set('artisanpack.security.security-headers', $headers);
 
         $request = new Request();
         $middleware = new SecurityHeadersMiddleware();
@@ -40,7 +40,7 @@ class SecurityHeadersMiddlewareTest extends TestCase
             'X-Content-Type-Options' => null, // This should be ignored
             'Referrer-Policy' => '', // This should be ignored
         ];
-        Config::set('security.security-headers', $headers);
+        Config::set('artisanpack.security.security-headers', $headers);
 
         $request = new Request();
         $middleware = new SecurityHeadersMiddleware();
