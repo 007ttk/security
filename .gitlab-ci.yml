@@ -28,7 +28,20 @@ build:vendors:
       files:
         - composer.lock
     policy: pull-push
-  image: composer:2
+  image: php:8.2
+  before_script:
+    - |
+      # Install system dependencies
+      apt-get update && apt-get install -y git unzip libzip-dev
+      # Install PHP extensions
+      docker-php-ext-install zip
+      # Install Composer
+      php -r "copy('https://getcomposer.org/installer', 'composer-setup.php');"
+      php composer-setup.php
+      php -r "unlink('composer-setup.php');"
+      mv composer.phar /usr/local/bin/composer
+      # Configure GitLab authentication for Composer
+      composer config --global gitlab-token.gitlab.com ${CI_JOB_TOKEN}
   script:
     - composer install --no-interaction --prefer-dist --optimize-autoloader
 
