@@ -27,12 +27,16 @@
   "require": {
     "php": "^8.2",
     "illuminate/support": ">=5.3",
-    "laminas/laminas-escaper": "^2.16"
+    "laminas/laminas-escaper": "^2.16",
+    "artisanpack-ui/core": "^1.0",
+    "pragmarx/google2fa-laravel": "^2.3"
   },
   "require-dev": {
     "pestphp/pest": "^3.8",
     "pestphp/pest-plugin-laravel": "^3.1",
-    "orchestra/testbench": "^10.2"
+    "orchestra/testbench": "^10.2",
+    "laravel/pint": "^1.25",
+    "artisanpack-ui/code-style-pint": "^1.0"
   },
   "config": {
     "allow-plugins": {
