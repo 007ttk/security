@@ -5,9 +5,14 @@ namespace ArtisanPackUI\Security;
 use ArtisanPackUI\Security\Console\Commands\CheckSecurityConfiguration;
 use ArtisanPackUI\Security\Console\Commands\CheckSessionSecurity;
 use ArtisanPackUI\Security\Console\Commands\ClearRateLimits;
+use ArtisanPackUI\Security\Console\Commands\CreateRole;
+use ArtisanPackUI\Security\Console\Commands\CreatePermission;
+use ArtisanPackUI\Security\Console\Commands\AssignRole;
+use ArtisanPackUI\Security\Console\Commands\RevokeRole;
 use ArtisanPackUI\Security\Http\Middleware\EnsureSessionIsEncrypted;
 use ArtisanPackUI\Security\Http\Middleware\SecurityHeadersMiddleware;
 use ArtisanPackUI\Security\Http\Middleware\XssProtection;
+use ArtisanPackUI\Security\Http\Middleware\CheckPermission;
 use ArtisanPackUI\Security\Rules\NoHtml;
 use ArtisanPackUI\Security\Rules\PasswordPolicy;
 use ArtisanPackUI\Security\Rules\SecureFile;
@@ -18,11 +23,18 @@ use Exception;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Contracts\Http\Kernel;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\ServiceProvider;
+use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Blade;
+use ArtisanPackUI\Security\Models\Permission;
+use ArtisanPackUI\Security\Models\Role;
+use Illuminate\Contracts\Auth\Authenticatable as User;
 
 class SecurityServiceProvider extends ServiceProvider
 {
@@ -75,6 +87,8 @@ class SecurityServiceProvider extends ServiceProvider
 		$this->bootRateLimiting();
 
         $this->bootProductionValidations();
+
+        $this->bootRbac();
 
         Validator::extend('password_policy', function ($attribute, $value, $parameters, $validator) {
             return (new PasswordPolicy)->passes($attribute, $value);
@@ -228,6 +242,103 @@ class SecurityServiceProvider extends ServiceProvider
                     Log::warning('Security configuration warning: ' . $warning);
                 }
             }
+        }
+    }
+
+    /**
+     * Boot the RBAC services.
+     *
+     * @return void
+     */
+    protected function bootRbac(): void
+    {
+        if (config('artisanpack.security.rbac.enabled')) {
+            $this->loadMigrationsFrom(__DIR__ . '/../database/migrations');
+
+            if ($this->app->runningInConsole()) {
+                $this->commands([
+                    CreateRole::class,
+                    CreatePermission::class,
+                    AssignRole::class,
+                    RevokeRole::class,
+                ]);
+            }
+
+            $this->app['router']->aliasMiddleware('permission', CheckPermission::class);
+
+            // RBAC Gate integration: Only grant access when user has explicit permission.
+            // Returns null for unmatched abilities so normal Gate/Policy checks can proceed.
+            // Permission names are cached to avoid DB queries on every authorization check.
+            Gate::before(function ($user, $ability) {
+                if (! method_exists($user, 'hasPermission')) {
+                    return null;
+                }
+
+                // Check against cached permission names instead of querying DB each time
+                $permissionNames = $this->getCachedPermissionNames();
+                if (in_array($ability, $permissionNames, true) && $user->hasPermission($ability)) {
+                    return true;
+                }
+
+                return null;
+            });
+
+            // Register model events to invalidate permission cache when permissions change
+            Permission::created(fn () => $this->flushPermissionNamesCache());
+            Permission::updated(fn () => $this->flushPermissionNamesCache());
+            Permission::deleted(fn () => $this->flushPermissionNamesCache());
+
+            Blade::directive('role', function ($role) {
+                return "<?php if(auth()->check() && auth()->user()->hasRole({$role})): ?>";
+            });
+
+            Blade::directive('endrole', function () {
+                return "<?php endif; ?>";
+            });
+
+            Blade::directive('permission', function ($permission) {
+                return "<?php if(auth()->check() && auth()->user()->can({$permission})): ?>";
+            });
+
+            Blade::directive('endpermission', function () {
+                return "<?php endif; ?>";
+            });
+        }
+    }
+
+    /**
+     * Get cached permission names for Gate checks.
+     *
+     * @return array
+     */
+    protected function getCachedPermissionNames(): array
+    {
+        $cacheKey = 'rbac_permission_names';
+
+        if (Cache::getStore() instanceof \Illuminate\Cache\TaggableStore) {
+            return Cache::tags(['rbac'])->remember($cacheKey, 3600, function () {
+                return Permission::pluck('name')->toArray();
+            });
+        }
+
+        return Cache::remember($cacheKey, 3600, function () {
+            return Permission::pluck('name')->toArray();
+        });
+    }
+
+    /**
+     * Flush the cached permission names.
+     *
+     * @return void
+     */
+    protected function flushPermissionNamesCache(): void
+    {
+        $cacheKey = 'rbac_permission_names';
+
+        if (Cache::getStore() instanceof \Illuminate\Cache\TaggableStore) {
+            Cache::tags(['rbac'])->forget($cacheKey);
+        } else {
+            Cache::forget($cacheKey);
         }
     }
 }
