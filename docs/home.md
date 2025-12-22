@@ -9,6 +9,7 @@ Welcome to the ArtisanPack UI Security package documentation. This package provi
 ## Quick Start
 
 - [Getting Started](getting-started) - Installation, setup, and basic usage
+- [Role-Based Access Control](rbac) - How to manage roles and permissions
 - [Two-Factor Authentication](two-factor-authentication) - Complete 2FA setup and implementation guide
 - [API Reference](api-reference) - Complete function reference with examples
 

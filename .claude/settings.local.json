@@ -1,7 +1,9 @@
 {
   "permissions": {
     "allow": [
-      "Bash(mkdir:*)"
+      "Bash(mkdir:*)",
+      "Bash(./vendor/bin/phpunit:*)",
+      "Bash(./vendor/bin/pest:*)"
     ],
     "deny": [],
     "ask": []
