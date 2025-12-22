@@ -31,6 +31,8 @@ class ApiSecurityTest extends TestCase
             'standard' => ['read', 'write'],
             'admin' => ['read', 'write', 'delete', 'admin'],
         ]);
+        // Disable event logging since security_events table is not set up
+        Config::set('artisanpack.security.eventLogging.enabled', false);
 
         Config::set('database.default', 'testbench');
         Config::set('database.connections.testbench', [

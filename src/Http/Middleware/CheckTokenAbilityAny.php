@@ -4,12 +4,18 @@ declare(strict_types=1);
 
 namespace ArtisanPackUI\Security\Http\Middleware;
 
+use ArtisanPackUI\Security\Contracts\SecurityEventLoggerInterface;
+use ArtisanPackUI\Security\Models\SecurityEvent;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 
 class CheckTokenAbilityAny
 {
+    public function __construct(
+        protected ?SecurityEventLoggerInterface $logger = null
+    ) {}
+
     /**
      * Handle an incoming request.
      *
@@ -27,6 +33,11 @@ class CheckTokenAbilityAny
         $user = $request->user();
 
         if (! $user) {
+            $this->logApiAccessFailure('ability_denied_unauthenticated', [
+                'required_abilities' => $abilities,
+                'reason' => 'unauthenticated',
+            ]);
+
             return response()->json([
                 'message' => 'Unauthenticated.',
                 'error' => 'unauthenticated',
@@ -36,6 +47,12 @@ class CheckTokenAbilityAny
         $token = $user->currentAccessToken();
 
         if (! $token) {
+            $this->logApiAccessFailure('ability_denied_no_token', [
+                'user_id' => $user->getAuthIdentifier(),
+                'required_abilities' => $abilities,
+                'reason' => 'no_token',
+            ]);
+
             return response()->json([
                 'message' => 'No access token present.',
                 'error' => 'no_token',
@@ -48,6 +65,13 @@ class CheckTokenAbilityAny
                 return $next($request);
             }
         }
+
+        $this->logApiAccessFailure('ability_denied', [
+            'user_id' => $user->getAuthIdentifier(),
+            'token_id' => $token->id ?? null,
+            'required_abilities' => $abilities,
+            'reason' => 'insufficient_ability',
+        ]);
 
         return response()->json([
             'message' => 'Token does not have any of the required abilities.',
@@ -71,5 +95,17 @@ class CheckTokenAbilityAny
 
         return in_array('*', $abilities, true)
             || in_array($ability, $abilities, true);
+    }
+
+    /**
+     * Log an API access failure event.
+     */
+    protected function logApiAccessFailure(string $event, array $data): void
+    {
+        if ($this->logger === null) {
+            return;
+        }
+
+        $this->logger->apiAccess($event, $data, SecurityEvent::SEVERITY_WARNING);
     }
 }

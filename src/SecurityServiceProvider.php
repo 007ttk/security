@@ -14,6 +14,12 @@ use ArtisanPackUI\Security\Console\Commands\ListApiTokens;
 use ArtisanPackUI\Security\Console\Commands\RevokeApiToken;
 use ArtisanPackUI\Security\Console\Commands\PruneApiTokens;
 use ArtisanPackUI\Security\Console\Commands\CheckApiSecurity;
+use ArtisanPackUI\Security\Console\Commands\ListSecurityEvents;
+use ArtisanPackUI\Security\Console\Commands\ClearSecurityEvents;
+use ArtisanPackUI\Security\Console\Commands\ExportSecurityEvents;
+use ArtisanPackUI\Security\Console\Commands\SecurityEventStats;
+use ArtisanPackUI\Security\Console\Commands\DetectSuspiciousActivity;
+use ArtisanPackUI\Security\Contracts\SecurityEventLoggerInterface;
 use ArtisanPackUI\Security\Http\Middleware\EnsureSessionIsEncrypted;
 use ArtisanPackUI\Security\Http\Middleware\SecurityHeadersMiddleware;
 use ArtisanPackUI\Security\Http\Middleware\XssProtection;
@@ -22,12 +28,19 @@ use ArtisanPackUI\Security\Http\Middleware\ApiSecurity;
 use ArtisanPackUI\Security\Http\Middleware\ApiRateLimiting;
 use ArtisanPackUI\Security\Http\Middleware\CheckTokenAbility;
 use ArtisanPackUI\Security\Http\Middleware\CheckTokenAbilityAny;
+use ArtisanPackUI\Security\Listeners\LogAuthenticationEvents;
+use ArtisanPackUI\Security\Livewire\SecurityDashboard;
+use ArtisanPackUI\Security\Livewire\SecurityEventList;
+use ArtisanPackUI\Security\Livewire\SecurityStats;
 use ArtisanPackUI\Security\Models\ApiToken;
+use ArtisanPackUI\Security\Observers\PermissionObserver;
+use ArtisanPackUI\Security\Observers\RoleObserver;
 use ArtisanPackUI\Security\Rules\NoHtml;
 use ArtisanPackUI\Security\Rules\PasswordPolicy;
 use ArtisanPackUI\Security\Rules\SecureFile;
 use ArtisanPackUI\Security\Rules\SecureUrl;
 use ArtisanPackUI\Security\Services\EnvironmentValidationService;
+use ArtisanPackUI\Security\Services\SecurityEventLogger;
 use ArtisanPackUI\Security\TwoFactor\TwoFactorManager;
 use Exception;
 use Illuminate\Cache\RateLimiting\Limit;
@@ -45,6 +58,7 @@ use Illuminate\Support\Facades\Blade;
 use ArtisanPackUI\Security\Models\Permission;
 use ArtisanPackUI\Security\Models\Role;
 use Illuminate\Contracts\Auth\Authenticatable as User;
+use Livewire\Livewire;
 
 class SecurityServiceProvider extends ServiceProvider
 {
@@ -58,6 +72,12 @@ class SecurityServiceProvider extends ServiceProvider
 		$this->app->singleton( TwoFactorManager::class, function () {
 			return new TwoFactorManager();
 		} );
+
+		$this->app->singleton(SecurityEventLoggerInterface::class, function ($app) {
+			return new SecurityEventLogger();
+		});
+
+		$this->app->alias(SecurityEventLoggerInterface::class, 'security-events');
 
 		$this->mergeConfigFrom(
 			__DIR__ . '/../config/security.php', 'artisanpack-security-temp'
@@ -101,6 +121,8 @@ class SecurityServiceProvider extends ServiceProvider
         $this->bootRbac();
 
         $this->bootApiSecurity();
+
+        $this->bootEventLogging();
 
         Validator::extend('password_policy', function ($attribute, $value, $parameters, $validator) {
             return (new PasswordPolicy)->passes($attribute, $value);
@@ -468,6 +490,99 @@ class SecurityServiceProvider extends ServiceProvider
             return Limit::perMinutes($config['decay_minutes'], $config['max_attempts'])
                 ->by($request->ip());
         });
+    }
+
+    /**
+     * Boot the security event logging services.
+     *
+     * @return void
+     */
+    protected function bootEventLogging(): void
+    {
+        if (! config('artisanpack.security.eventLogging.enabled')) {
+            return;
+        }
+
+        // Load migrations
+        $this->loadMigrationsFrom(__DIR__ . '/../database/migrations');
+
+        // Load views with namespace
+        $this->loadViewsFrom(__DIR__ . '/../resources/views', 'security');
+
+        // Register authentication event listeners
+        Event::subscribe(LogAuthenticationEvents::class);
+
+        // Register model observers for RBAC changes if RBAC is enabled
+        if (config('artisanpack.security.rbac.enabled')) {
+            Role::observe(RoleObserver::class);
+            Permission::observe(PermissionObserver::class);
+        }
+
+        // Register console commands
+        if ($this->app->runningInConsole()) {
+            $this->commands([
+                ListSecurityEvents::class,
+                ClearSecurityEvents::class,
+                ExportSecurityEvents::class,
+                SecurityEventStats::class,
+                DetectSuspiciousActivity::class,
+            ]);
+        }
+
+        // Register default gate for dashboard authorization
+        $this->registerSecurityDashboardGate();
+
+        // Register dashboard routes and Livewire components
+        if (config('artisanpack.security.eventLogging.dashboard.enabled')) {
+            $this->registerSecurityDashboard();
+        }
+    }
+
+    /**
+     * Register the default gate for security dashboard access.
+     *
+     * Users should override this gate in their AuthServiceProvider to
+     * implement their own authorization logic (e.g., checking for admin role).
+     *
+     * @return void
+     */
+    protected function registerSecurityDashboardGate(): void
+    {
+        // Only define if not already defined by the application
+        if (! Gate::has('viewSecurityDashboard')) {
+            Gate::define('viewSecurityDashboard', function ($user) {
+                // Default: deny access. Applications should define their own gate.
+                // Example in AuthServiceProvider:
+                //   Gate::define('viewSecurityDashboard', fn ($user) => $user->hasRole('admin'));
+                return false;
+            });
+        }
+    }
+
+    /**
+     * Register the security dashboard routes and Livewire components.
+     *
+     * @return void
+     */
+    protected function registerSecurityDashboard(): void
+    {
+        // Check if Livewire is available
+        if (! class_exists(Livewire::class)) {
+            Log::warning(
+                'ArtisanPack Security: Dashboard is enabled but Livewire is not installed. ' .
+                'Install Livewire with: composer require livewire/livewire'
+            );
+
+            return;
+        }
+
+        // Register Livewire components
+        Livewire::component('security-dashboard', SecurityDashboard::class);
+        Livewire::component('security-event-list', SecurityEventList::class);
+        Livewire::component('security-stats', SecurityStats::class);
+
+        // Load dashboard routes
+        $this->loadRoutesFrom(__DIR__ . '/../routes/security-dashboard.php');
     }
 }
 
