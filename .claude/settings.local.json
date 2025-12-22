@@ -5,7 +5,9 @@
       "Bash(./vendor/bin/phpunit:*)",
       "Bash(./vendor/bin/pest:*)",
       "Bash(composer update:*)",
-      "Bash(php:*)"
+      "Bash(php:*)",
+      "Bash(git fetch:*)",
+      "Bash(xargs git branch -D)"
     ],
     "deny": [],
     "ask": []

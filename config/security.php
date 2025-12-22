@@ -268,5 +268,149 @@ return [
             'middleware' => ['api'],
         ],
     ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Security Event Logging
+    |--------------------------------------------------------------------------
+    |
+    | Configure comprehensive security event logging for monitoring and
+    | audit purposes. Events can be stored in the database and/or logged
+    | to a specific log channel.
+    |
+    */
+    'eventLogging' => [
+        /*
+         * Master toggle for security event logging.
+         */
+        'enabled' => env('SECURITY_EVENT_LOGGING_ENABLED', true),
+
+        /*
+         * Storage options for security events.
+         */
+        'storage' => [
+            /*
+             * Store events in the database.
+             */
+            'database' => env('SECURITY_EVENTS_STORE_DB', true),
+
+            /*
+             * Log channel to use for event logging.
+             * Set to null to use the default log channel.
+             */
+            'logChannel' => env('SECURITY_LOG_CHANNEL', null),
+        ],
+
+        /*
+         * Configure which event types to log.
+         */
+        'events' => [
+            'authentication' => [
+                'enabled' => true,
+                'logLevel' => 'info',
+                'events' => [
+                    'loginSuccess' => true,
+                    'loginFailed' => true,
+                    'logout' => true,
+                    'lockout' => true,
+                    'passwordReset' => true,
+                    'registered' => true,
+                    'emailVerified' => true,
+                    'otherDeviceLogout' => true,
+                    'twoFactorSuccess' => true,
+                    'twoFactorFailed' => true,
+                ],
+            ],
+            'authorization' => [
+                'enabled' => true,
+                'logLevel' => 'warning',
+                'events' => [
+                    'permissionDenied' => true,
+                    'roleCheckFailed' => true,
+                ],
+            ],
+            'apiAccess' => [
+                'enabled' => true,
+                'logLevel' => 'info',
+                'events' => [
+                    'tokenCreated' => true,
+                    'tokenRevoked' => true,
+                    'tokenExpiredAccess' => true,
+                    'invalidToken' => true,
+                    'abilityDenied' => true,
+                ],
+            ],
+            'securityViolations' => [
+                'enabled' => true,
+                'logLevel' => 'error',
+                'events' => [
+                    'cspViolation' => true,
+                    'rateLimitExceeded' => true,
+                    'invalidSignature' => true,
+                ],
+            ],
+            'roleChanges' => [
+                'enabled' => true,
+                'logLevel' => 'info',
+            ],
+            'permissionChanges' => [
+                'enabled' => true,
+                'logLevel' => 'info',
+            ],
+            'tokenManagement' => [
+                'enabled' => true,
+                'logLevel' => 'info',
+            ],
+        ],
+
+        /*
+         * Retention policy for security events.
+         */
+        'retention' => [
+            'enabled' => env('SECURITY_EVENTS_RETENTION_ENABLED', true),
+            'days' => env('SECURITY_EVENTS_RETENTION_DAYS', 90),
+            'keepCritical' => true,
+        ],
+
+        /*
+         * Suspicious activity detection configuration.
+         */
+        'suspiciousActivity' => [
+            'enabled' => env('SECURITY_SUSPICIOUS_DETECTION_ENABLED', true),
+            'thresholds' => [
+                'failedLoginsPerIp' => 5,
+                'failedLoginsPerUser' => 3,
+                'apiErrorsPerToken' => 10,
+                'permissionDenialsPerUser' => 5,
+            ],
+            'windowMinutes' => 15,
+        ],
+
+        /*
+         * Alerting configuration for suspicious activities.
+         */
+        'alerting' => [
+            'enabled' => env('SECURITY_ALERTS_ENABLED', false),
+            'channels' => ['mail'],
+            'recipients' => env('SECURITY_ALERT_RECIPIENTS', ''),
+            'throttleMinutes' => 15,
+        ],
+
+        /*
+         * Security dashboard configuration.
+         *
+         * By default, the dashboard requires the 'viewSecurityDashboard' gate.
+         * You can customize this by defining the gate in your AuthServiceProvider
+         * or by changing the middleware below to use your own authorization.
+         *
+         * Example gate definition in AuthServiceProvider::boot():
+         *   Gate::define('viewSecurityDashboard', fn ($user) => $user->hasRole('admin'));
+         */
+        'dashboard' => [
+            'enabled' => env('SECURITY_DASHBOARD_ENABLED', true),
+            'routePrefix' => 'security',
+            'middleware' => ['web', 'auth', 'can:viewSecurityDashboard'],
+        ],
+    ],
 ];
     
