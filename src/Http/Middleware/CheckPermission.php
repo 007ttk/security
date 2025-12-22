@@ -11,7 +11,7 @@ class CheckPermission
     public function handle(Request $request, Closure $next, $permission)
     {
         if (Auth::guest()) {
-            abort(403);
+            abort(401);
         }
 
         if (!Auth::user()->can($permission)) {

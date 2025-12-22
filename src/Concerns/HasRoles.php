@@ -10,7 +10,30 @@ trait HasRoles
 {
     public function roles(): BelongsToMany
     {
-        return $this->belongsToMany(Role::class, 'role_user', 'user_id');
+        return $this->belongsToMany(
+            Role::class,
+            $this->getRoleUserPivotTable(),
+            $this->getRoleUserForeignKey(),
+            'role_id'
+        );
+    }
+
+    /**
+     * Get the pivot table name for role-user relationships.
+     * Override this method in your model to customize.
+     */
+    protected function getRoleUserPivotTable(): string
+    {
+        return config('artisanpack.security.rbac.tables.role_user', 'role_user');
+    }
+
+    /**
+     * Get the foreign key name for the user in the pivot table.
+     * Override this method in your model to customize.
+     */
+    protected function getRoleUserForeignKey(): string
+    {
+        return config('artisanpack.security.rbac.foreign_keys.user', 'user_id');
     }
 
     public function hasRole($role): bool

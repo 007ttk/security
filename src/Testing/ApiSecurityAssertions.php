@@ -38,7 +38,11 @@ trait ApiSecurityAssertions
      */
     protected function createExpiredTestApiToken($user, array $abilities = ['*']): string
     {
-        $token = $user->createToken('expired-test-token', $abilities);
+        if (method_exists($user, 'createApiToken')) {
+            $token = $user->createApiToken('expired-test-token', $abilities);
+        } else {
+            $token = $user->createToken('expired-test-token', $abilities);
+        }
 
         // Set expiration to the past
         $token->accessToken->update([
@@ -57,7 +61,11 @@ trait ApiSecurityAssertions
      */
     protected function createRevokedTestApiToken($user, array $abilities = ['*']): string
     {
-        $token = $user->createToken('revoked-test-token', $abilities);
+        if (method_exists($user, 'createApiToken')) {
+            $token = $user->createApiToken('revoked-test-token', $abilities);
+        } else {
+            $token = $user->createToken('revoked-test-token', $abilities);
+        }
 
         $token->accessToken->update([
             'is_revoked' => true,
