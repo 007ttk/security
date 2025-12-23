@@ -21,12 +21,17 @@ use ArtisanPackUI\Security\Console\Commands\ExportSecurityEvents;
 use ArtisanPackUI\Security\Console\Commands\ScanQuarantinedFiles;
 use ArtisanPackUI\Security\Console\Commands\SecurityEventStats;
 use ArtisanPackUI\Security\Console\Commands\DetectSuspiciousActivity;
+use ArtisanPackUI\Security\Console\Commands\CspPrune;
+use ArtisanPackUI\Security\Console\Commands\CspStats;
+use ArtisanPackUI\Security\Console\Commands\CspTest;
 use ArtisanPackUI\Security\Contracts\BreachCheckerInterface;
+use ArtisanPackUI\Security\Contracts\CspPolicyInterface;
 use ArtisanPackUI\Security\Contracts\FileValidatorInterface;
 use ArtisanPackUI\Security\Contracts\MalwareScannerInterface;
 use ArtisanPackUI\Security\Contracts\PasswordSecurityServiceInterface;
 use ArtisanPackUI\Security\Contracts\SecureFileStorageInterface;
 use ArtisanPackUI\Security\Contracts\SecurityEventLoggerInterface;
+use ArtisanPackUI\Security\Http\Middleware\ContentSecurityPolicy;
 use ArtisanPackUI\Security\Http\Middleware\EnsureSessionIsEncrypted;
 use ArtisanPackUI\Security\Http\Middleware\ScanUploadedFiles;
 use ArtisanPackUI\Security\Http\Middleware\SecurityHeadersMiddleware;
@@ -40,10 +45,15 @@ use ArtisanPackUI\Security\Http\Middleware\CheckTokenAbilityAny;
 use ArtisanPackUI\Security\Http\Middleware\EnforcePasswordPolicy;
 use ArtisanPackUI\Security\Http\Middleware\RequirePasswordChange;
 use ArtisanPackUI\Security\Listeners\LogAuthenticationEvents;
+use ArtisanPackUI\Security\Livewire\CspDashboard;
 use ArtisanPackUI\Security\Livewire\PasswordStrengthMeter;
 use ArtisanPackUI\Security\Livewire\SecurityDashboard;
 use ArtisanPackUI\Security\Livewire\SecurityEventList;
 use ArtisanPackUI\Security\Livewire\SecurityStats;
+use ArtisanPackUI\Security\Services\Csp\CspNonceGenerator;
+use ArtisanPackUI\Security\Services\Csp\CspPolicyService;
+use ArtisanPackUI\Security\Services\Csp\CspViolationHandler;
+use ArtisanPackUI\Security\View\Components\CspNonce;
 use ArtisanPackUI\Security\Models\ApiToken;
 use ArtisanPackUI\Security\Observers\PermissionObserver;
 use ArtisanPackUI\Security\Observers\RoleObserver;
@@ -140,6 +150,28 @@ class SecurityServiceProvider extends ServiceProvider
 			);
 		});
 
+		// Register CSP services
+		$this->app->scoped(CspNonceGenerator::class, function ($app) {
+			return new CspNonceGenerator(
+				(int) config('artisanpack.security.csp.nonce.length', 16)
+			);
+		});
+
+		$this->app->scoped(CspPolicyInterface::class, function ($app) {
+			return new CspPolicyService(
+				$app->make(CspNonceGenerator::class)
+			);
+		});
+
+		$this->app->singleton(CspViolationHandler::class, function ($app) {
+			$logger = null;
+			if (config('artisanpack.security.csp.reporting.logToSecurityEvents', true)) {
+				$logger = $app->make(SecurityEventLoggerInterface::class);
+			}
+
+			return new CspViolationHandler($logger);
+		});
+
 		$this->mergeConfigFrom(
 			__DIR__ . '/../config/security.php', 'artisanpack-security-temp'
 		);
@@ -188,6 +220,8 @@ class SecurityServiceProvider extends ServiceProvider
         $this->bootPasswordSecurity();
 
         $this->bootFileUploadSecurity();
+
+        $this->bootCsp();
 
         Validator::extend('password_policy', function ($attribute, $value, $parameters, $validator) {
             return (new PasswordPolicy)->passes($attribute, $value);
@@ -723,6 +757,46 @@ class SecurityServiceProvider extends ServiceProvider
 
         // Load secure file serving routes
         $this->loadRoutesFrom(__DIR__ . '/../routes/secure-files.php');
+    }
+
+    /**
+     * Boot the Content Security Policy services.
+     *
+     * @return void
+     */
+    protected function bootCsp(): void
+    {
+        if (! config('artisanpack.security.csp.enabled', true)) {
+            return;
+        }
+
+        // Load CSP migrations
+        $this->loadMigrationsFrom(__DIR__ . '/../database/migrations');
+
+        // Register middleware alias
+        $this->app['router']->aliasMiddleware('csp', ContentSecurityPolicy::class);
+
+        // Register Blade component
+        Blade::component('csp-nonce', CspNonce::class);
+
+        // Register console commands
+        if ($this->app->runningInConsole()) {
+            $this->commands([
+                CspStats::class,
+                CspTest::class,
+                CspPrune::class,
+            ]);
+        }
+
+        // Register Livewire component if Livewire is available
+        if (class_exists(Livewire::class)) {
+            Livewire::component('csp-dashboard', CspDashboard::class);
+        }
+
+        // Load CSP routes for violation reporting
+        if (config('artisanpack.security.csp.reporting.enabled', true)) {
+            $this->loadRoutesFrom(__DIR__ . '/../routes/csp.php');
+        }
     }
 }
 
