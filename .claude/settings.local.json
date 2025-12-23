@@ -7,7 +7,8 @@
       "Bash(composer update:*)",
       "Bash(php:*)",
       "Bash(git fetch:*)",
-      "Bash(xargs git branch -D)"
+      "Bash(xargs git branch -D)",
+      "Bash(grep:*)"
     ],
     "deny": [],
     "ask": []

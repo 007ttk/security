@@ -633,5 +633,144 @@ return [
             'downloads' => true,
         ],
     ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Content Security Policy (CSP)
+    |--------------------------------------------------------------------------
+    |
+    | Configure Content Security Policy for your application. CSP helps prevent
+    | XSS attacks by specifying which dynamic resources are allowed to load.
+    | This implementation is optimized for Livewire applications using nonces
+    | and strict-dynamic for enhanced security.
+    |
+    */
+    'csp' => [
+        /*
+         * Master toggle for CSP functionality.
+         */
+        'enabled' => env('SECURITY_CSP_ENABLED', true),
+
+        /*
+         * When true, violations are reported but not enforced.
+         * Useful for testing new policies without breaking functionality.
+         */
+        'reportOnly' => env('SECURITY_CSP_REPORT_ONLY', false),
+
+        /*
+         * Default preset to use for CSP policy generation.
+         * Available presets: livewire, strict, relaxed
+         */
+        'preset' => env('SECURITY_CSP_PRESET', 'livewire'),
+
+        /*
+         * Length of the nonce in bytes (base64 encoded).
+         * 16 bytes = 22 base64 characters, recommended minimum.
+         */
+        'nonceLength' => 16,
+
+        /*
+         * Additional trusted external sources by directive.
+         * These are merged with the preset defaults.
+         */
+        'additionalSources' => [
+            'scriptSrc' => [
+                // 'https://cdn.example.com',
+            ],
+            'styleSrc' => [
+                'https://fonts.googleapis.com',
+                'https://fonts.bunny.net',
+            ],
+            'fontSrc' => [
+                'https://fonts.gstatic.com',
+                'https://fonts.bunny.net',
+            ],
+            'imgSrc' => [
+                'data:',
+                'https:',
+            ],
+            'connectSrc' => [
+                // 'https://api.example.com',
+            ],
+            'frameSrc' => [
+                // 'https://www.youtube.com',
+            ],
+            'mediaSrc' => [
+                // 'https://media.example.com',
+            ],
+        ],
+
+        /*
+         * Custom directives to override or extend the preset.
+         * Format: 'directive-name' => ['value1', 'value2']
+         */
+        'customDirectives' => [
+            // 'base-uri' => ["'self'"],
+            // 'form-action' => ["'self'"],
+        ],
+
+        /*
+         * Route patterns to exclude from CSP headers.
+         * Supports wildcards: 'api/*', 'webhook/*'
+         */
+        'excludedRoutes' => [
+            'api/*',
+            'livewire/*',
+        ],
+
+        /*
+         * Violation reporting configuration.
+         */
+        'reporting' => [
+            /*
+             * Enable violation reporting endpoint.
+             */
+            'enabled' => env('SECURITY_CSP_REPORTING_ENABLED', true),
+
+            /*
+             * URI for browsers to send violation reports.
+             * This route is automatically registered by the package.
+             */
+            'uri' => '/csp-violation',
+
+            /*
+             * Store violations in the database for analysis.
+             */
+            'storeViolations' => env('SECURITY_CSP_STORE_VIOLATIONS', true),
+
+            /*
+             * Log violations to the security event logger.
+             */
+            'logToSecurityEvents' => true,
+
+            /*
+             * Maximum number of stored violations before pruning.
+             */
+            'maxStoredViolations' => 10000,
+
+            /*
+             * Days to retain violation reports.
+             */
+            'retentionDays' => 30,
+        ],
+
+        /*
+         * Apply CSP via meta tag in addition to HTTP header.
+         * Useful as a fallback but has some limitations.
+         */
+        'useMetaTag' => false,
+
+        /*
+         * Add upgrade-insecure-requests directive.
+         * Automatically upgrades HTTP requests to HTTPS.
+         */
+        'upgradeInsecureRequests' => env('SECURITY_CSP_UPGRADE_INSECURE', true),
+
+        /*
+         * Add block-all-mixed-content directive.
+         * Prevents loading any HTTP content on HTTPS pages.
+         */
+        'blockAllMixedContent' => false,
+    ],
 ];
     
