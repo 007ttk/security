@@ -772,5 +772,76 @@ return [
          */
         'blockAllMixedContent' => false,
     ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Security Testing Framework
+    |--------------------------------------------------------------------------
+    |
+    | Configure the security testing framework for automated vulnerability
+    | scanning, penetration testing, and performance benchmarking.
+    |
+    */
+    'testing' => [
+        'enabled' => env('SECURITY_TESTING_ENABLED', true),
+
+        /*
+         * Scanner configuration
+         */
+        'scanners' => [
+            'owasp' => [
+                'enabled' => true,
+                'categories' => ['A01', 'A02', 'A03', 'A04', 'A05', 'A06', 'A07', 'A08', 'A09', 'A10'],
+            ],
+            'dependencies' => [
+                'enabled' => true,
+                'composerLock' => base_path('composer.lock'),
+                'packageLock' => base_path('package-lock.json'),
+            ],
+            'configuration' => [
+                'enabled' => true,
+            ],
+            'headers' => [
+                'enabled' => true,
+            ],
+        ],
+
+        /*
+         * Security gate thresholds for CI/CD
+         */
+        'gate' => [
+            'maxCritical' => 0,
+            'maxHigh' => 0,
+            'maxMedium' => 10,
+            'maxOverheadPercent' => 15.0,
+        ],
+
+        /*
+         * Report settings
+         */
+        'reporting' => [
+            'defaultFormat' => 'json',
+            'outputPath' => storage_path('security-reports'),
+            'retentionDays' => 90,
+        ],
+
+        /*
+         * Baseline for differential scanning
+         */
+        'baseline' => [
+            'path' => base_path('.security-baseline.json'),
+            'autoUpdate' => false,
+        ],
+
+        /*
+         * Performance benchmark settings
+         */
+        'benchmarks' => [
+            'enabled' => true,
+            'iterations' => 1000,
+            'hashingIterations' => 50, // Fewer for intentionally slow operations
+            'maxOverheadPercent' => 15.0,
+        ],
+    ],
 ];
     

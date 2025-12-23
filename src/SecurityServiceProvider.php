@@ -24,6 +24,10 @@ use ArtisanPackUI\Security\Console\Commands\DetectSuspiciousActivity;
 use ArtisanPackUI\Security\Console\Commands\CspPrune;
 use ArtisanPackUI\Security\Console\Commands\CspStats;
 use ArtisanPackUI\Security\Console\Commands\CspTest;
+use ArtisanPackUI\Security\Console\Commands\SecurityAudit;
+use ArtisanPackUI\Security\Console\Commands\SecurityBaseline;
+use ArtisanPackUI\Security\Console\Commands\SecurityBenchmarkCommand;
+use ArtisanPackUI\Security\Console\Commands\SecurityScan;
 use ArtisanPackUI\Security\Contracts\BreachCheckerInterface;
 use ArtisanPackUI\Security\Contracts\CspPolicyInterface;
 use ArtisanPackUI\Security\Contracts\FileValidatorInterface;
@@ -222,6 +226,8 @@ class SecurityServiceProvider extends ServiceProvider
         $this->bootFileUploadSecurity();
 
         $this->bootCsp();
+
+        $this->bootSecurityTesting();
 
         Validator::extend('password_policy', function ($attribute, $value, $parameters, $validator) {
             return (new PasswordPolicy)->passes($attribute, $value);
@@ -796,6 +802,28 @@ class SecurityServiceProvider extends ServiceProvider
         // Load CSP routes for violation reporting
         if (config('artisanpack.security.csp.reporting.enabled', true)) {
             $this->loadRoutesFrom(__DIR__ . '/../routes/csp.php');
+        }
+    }
+
+    /**
+     * Boot the security testing services.
+     *
+     * @return void
+     */
+    protected function bootSecurityTesting(): void
+    {
+        if (! config('artisanpack.security.testing.enabled', true)) {
+            return;
+        }
+
+        // Register console commands
+        if ($this->app->runningInConsole()) {
+            $this->commands([
+                SecurityScan::class,
+                SecurityAudit::class,
+                SecurityBenchmarkCommand::class,
+                SecurityBaseline::class,
+            ]);
         }
     }
 }
