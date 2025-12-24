@@ -15,5 +15,6 @@ class TestUser extends User
         'id',
         'name',
         'email',
+        'password',
     ];
 }
