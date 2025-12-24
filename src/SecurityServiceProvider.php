@@ -25,9 +25,17 @@ use ArtisanPackUI\Security\Console\Commands\CspPrune;
 use ArtisanPackUI\Security\Console\Commands\CspStats;
 use ArtisanPackUI\Security\Console\Commands\CspTest;
 use ArtisanPackUI\Security\Console\Commands\SecurityAudit;
+use ArtisanPackUI\Security\Console\Commands\SecurityAuthAudit;
 use ArtisanPackUI\Security\Console\Commands\SecurityBaseline;
 use ArtisanPackUI\Security\Console\Commands\SecurityBenchmarkCommand;
 use ArtisanPackUI\Security\Console\Commands\SecurityScan;
+use ArtisanPackUI\Security\Console\Commands\CleanupExpiredSessions;
+use ArtisanPackUI\Security\Console\Commands\CleanupInactiveDevices;
+use ArtisanPackUI\Security\Console\Commands\ListWebAuthnCredentials;
+use ArtisanPackUI\Security\Console\Commands\ManageAccountLockout;
+use ArtisanPackUI\Security\Console\Commands\ManageSsoConfiguration;
+use ArtisanPackUI\Security\Console\Commands\PruneSuspiciousActivity;
+use ArtisanPackUI\Security\Console\Commands\TerminateUserSessions;
 use ArtisanPackUI\Security\Contracts\BreachCheckerInterface;
 use ArtisanPackUI\Security\Contracts\CspPolicyInterface;
 use ArtisanPackUI\Security\Contracts\FileValidatorInterface;
@@ -48,12 +56,51 @@ use ArtisanPackUI\Security\Http\Middleware\CheckTokenAbility;
 use ArtisanPackUI\Security\Http\Middleware\CheckTokenAbilityAny;
 use ArtisanPackUI\Security\Http\Middleware\EnforcePasswordPolicy;
 use ArtisanPackUI\Security\Http\Middleware\RequirePasswordChange;
+use ArtisanPackUI\Security\Http\Middleware\CheckAccountLockout;
+use ArtisanPackUI\Security\Http\Middleware\DetectSuspiciousActivity as DetectSuspiciousActivityMiddleware;
+use ArtisanPackUI\Security\Http\Middleware\EnforceSessionBinding;
+use ArtisanPackUI\Security\Http\Middleware\RequireTrustedDevice;
+use ArtisanPackUI\Security\Http\Middleware\StepUpAuthentication;
+use ArtisanPackUI\Security\Http\Middleware\ValidateDeviceFingerprint;
+use ArtisanPackUI\Security\Listeners\LogAdvancedAuthEvents;
 use ArtisanPackUI\Security\Listeners\LogAuthenticationEvents;
+use ArtisanPackUI\Security\Listeners\HandleSuspiciousActivity;
+use ArtisanPackUI\Security\Listeners\SendAccountLockedNotification;
+use ArtisanPackUI\Security\Listeners\SendNewDeviceNotification;
+use ArtisanPackUI\Security\Listeners\SendSocialAccountNotification;
+use ArtisanPackUI\Security\Listeners\SendWebAuthnCredentialNotification;
+use ArtisanPackUI\Security\Authentication\Contracts\AccountLockoutInterface;
+use ArtisanPackUI\Security\Authentication\Contracts\BiometricProviderInterface;
+use ArtisanPackUI\Security\Authentication\Contracts\DeviceFingerprintInterface;
+use ArtisanPackUI\Security\Authentication\Contracts\SessionSecurityInterface;
+use ArtisanPackUI\Security\Authentication\Contracts\SocialProviderInterface;
+use ArtisanPackUI\Security\Authentication\Contracts\SsoProviderInterface;
+use ArtisanPackUI\Security\Authentication\Contracts\SuspiciousActivityDetectorInterface;
+use ArtisanPackUI\Security\Authentication\Contracts\WebAuthnInterface;
+use ArtisanPackUI\Security\Authentication\Biometric\BiometricManager;
+use ArtisanPackUI\Security\Authentication\Device\DeviceFingerprintService;
+use ArtisanPackUI\Security\Authentication\Detection\SuspiciousActivityService;
+use ArtisanPackUI\Security\Authentication\Lockout\AccountLockoutManager;
+use ArtisanPackUI\Security\Authentication\Session\AdvancedSessionManager;
+use ArtisanPackUI\Security\Authentication\Social\SocialAuthManager;
+use ArtisanPackUI\Security\Authentication\Sso\SsoManager;
+use ArtisanPackUI\Security\Authentication\WebAuthn\WebAuthnManager;
+use ArtisanPackUI\Security\Events\NewDeviceDetected;
+use ArtisanPackUI\Security\Events\AccountLocked;
+use ArtisanPackUI\Security\Events\SuspiciousActivityDetected;
+use ArtisanPackUI\Security\Livewire\AccountLockoutStatus;
+use ArtisanPackUI\Security\Livewire\BiometricManager as BiometricManagerComponent;
 use ArtisanPackUI\Security\Livewire\CspDashboard;
+use ArtisanPackUI\Security\Livewire\DeviceManager;
 use ArtisanPackUI\Security\Livewire\PasswordStrengthMeter;
 use ArtisanPackUI\Security\Livewire\SecurityDashboard;
 use ArtisanPackUI\Security\Livewire\SecurityEventList;
 use ArtisanPackUI\Security\Livewire\SecurityStats;
+use ArtisanPackUI\Security\Livewire\SessionManager;
+use ArtisanPackUI\Security\Livewire\SocialAccountsManager;
+use ArtisanPackUI\Security\Livewire\StepUpAuthenticationModal;
+use ArtisanPackUI\Security\Livewire\SuspiciousActivityList;
+use ArtisanPackUI\Security\Livewire\WebAuthnCredentialsManager;
 use ArtisanPackUI\Security\Services\Csp\CspNonceGenerator;
 use ArtisanPackUI\Security\Services\Csp\CspPolicyService;
 use ArtisanPackUI\Security\Services\Csp\CspViolationHandler;
@@ -176,9 +223,66 @@ class SecurityServiceProvider extends ServiceProvider
 			return new CspViolationHandler($logger);
 		});
 
+		// Register advanced authentication services
+		$this->registerAdvancedAuthenticationServices();
+
 		$this->mergeConfigFrom(
 			__DIR__ . '/../config/security.php', 'artisanpack-security-temp'
 		);
+	}
+
+	/**
+	 * Register advanced authentication services.
+	 *
+	 * @return void
+	 */
+	protected function registerAdvancedAuthenticationServices(): void
+	{
+		// Social Authentication Manager
+		$this->app->singleton(SocialAuthManager::class, function ($app) {
+			return new SocialAuthManager();
+		});
+
+		// SSO Manager
+		$this->app->singleton(SsoManager::class, function ($app) {
+			return new SsoManager();
+		});
+
+		// WebAuthn Manager
+		$this->app->singleton(WebAuthnManager::class, function ($app) {
+			return new WebAuthnManager();
+		});
+
+		// Biometric Manager
+		$this->app->singleton(BiometricManager::class, function ($app) {
+			return new BiometricManager();
+		});
+
+		// Device Fingerprint Service
+		$this->app->singleton(DeviceFingerprintService::class, function ($app) {
+			return new DeviceFingerprintService();
+		});
+
+		// Advanced Session Manager
+		$this->app->singleton(AdvancedSessionManager::class, function ($app) {
+			return new AdvancedSessionManager();
+		});
+
+		// Suspicious Activity Service
+		$this->app->singleton(SuspiciousActivityService::class, function ($app) {
+			return new SuspiciousActivityService();
+		});
+
+		// Account Lockout Manager
+		$this->app->singleton(AccountLockoutManager::class, function ($app) {
+			return new AccountLockoutManager();
+		});
+
+		// Bind interfaces to implementations
+		$this->app->bind(DeviceFingerprintInterface::class, DeviceFingerprintService::class);
+		$this->app->bind(SessionSecurityInterface::class, AdvancedSessionManager::class);
+		$this->app->bind(SuspiciousActivityDetectorInterface::class, SuspiciousActivityService::class);
+		$this->app->bind(AccountLockoutInterface::class, AccountLockoutManager::class);
 	}
 
 	/**
@@ -228,6 +332,8 @@ class SecurityServiceProvider extends ServiceProvider
         $this->bootCsp();
 
         $this->bootSecurityTesting();
+
+        $this->bootAdvancedAuthentication();
 
         Validator::extend('password_policy', function ($attribute, $value, $parameters, $validator) {
             return (new PasswordPolicy)->passes($attribute, $value);
@@ -824,6 +930,172 @@ class SecurityServiceProvider extends ServiceProvider
                 SecurityBenchmarkCommand::class,
                 SecurityBaseline::class,
             ]);
+        }
+    }
+
+    /**
+     * Boot the advanced authentication services.
+     *
+     * @return void
+     */
+    protected function bootAdvancedAuthentication(): void
+    {
+        // Load authentication migrations
+        $this->loadMigrationsFrom(__DIR__ . '/../database/migrations/authentication');
+
+        // Register middleware aliases
+        $this->registerAuthenticationMiddleware();
+
+        // Register event listeners
+        $this->registerAuthenticationEventListeners();
+
+        // Register Livewire components
+        $this->registerAuthenticationLivewireComponents();
+
+        // Register console commands
+        if ($this->app->runningInConsole()) {
+            $this->commands([
+                CleanupExpiredSessions::class,
+                CleanupInactiveDevices::class,
+                ListWebAuthnCredentials::class,
+                ManageAccountLockout::class,
+                ManageSsoConfiguration::class,
+                PruneSuspiciousActivity::class,
+                SecurityAuthAudit::class,
+                TerminateUserSessions::class,
+            ]);
+        }
+
+        // Load authentication routes
+        if (config('artisanpack.security.auth_routes.enabled', true)) {
+            $this->loadRoutesFrom(__DIR__ . '/../routes/authentication.php');
+        }
+    }
+
+    /**
+     * Register authentication middleware aliases.
+     *
+     * @return void
+     */
+    protected function registerAuthenticationMiddleware(): void
+    {
+        $router = $this->app['router'];
+
+        // Account lockout middleware
+        if (config('artisanpack.security.account_lockout.enabled', true)) {
+            $router->aliasMiddleware('check.lockout', CheckAccountLockout::class);
+        }
+
+        // Device fingerprinting middleware
+        if (config('artisanpack.security.device_fingerprinting.enabled', true)) {
+            $router->aliasMiddleware('device.fingerprint', ValidateDeviceFingerprint::class);
+            $router->aliasMiddleware('device.trusted', RequireTrustedDevice::class);
+        }
+
+        // Advanced session middleware
+        if (config('artisanpack.security.advanced_sessions.enabled', true)) {
+            $router->aliasMiddleware('session.binding', EnforceSessionBinding::class);
+        }
+
+        // Suspicious activity detection middleware
+        if (config('artisanpack.security.suspicious_activity.enabled', true)) {
+            $router->aliasMiddleware('detect.suspicious', DetectSuspiciousActivityMiddleware::class);
+        }
+
+        // Step-up authentication middleware
+        if (config('artisanpack.security.step_up_authentication.enabled', true)) {
+            $router->aliasMiddleware('step.up', StepUpAuthentication::class);
+        }
+    }
+
+    /**
+     * Register authentication event listeners.
+     *
+     * @return void
+     */
+    protected function registerAuthenticationEventListeners(): void
+    {
+        // Subscribe to advanced auth event logging
+        Event::subscribe(LogAdvancedAuthEvents::class);
+
+        // Register individual event listeners
+        if (config('artisanpack.security.notifications.enabled', true)) {
+            // New device notifications
+            if (config('artisanpack.security.notifications.new_device_login', true)) {
+                Event::listen(NewDeviceDetected::class, SendNewDeviceNotification::class);
+            }
+
+            // Account locked notifications
+            if (config('artisanpack.security.notifications.account_locked', true)) {
+                Event::listen(AccountLocked::class, SendAccountLockedNotification::class);
+            }
+
+            // WebAuthn credential notifications
+            if (config('artisanpack.security.notifications.webauthn_credential', true)) {
+                Event::subscribe(SendWebAuthnCredentialNotification::class);
+            }
+
+            // Social account notifications
+            if (config('artisanpack.security.notifications.social_account', true)) {
+                Event::subscribe(SendSocialAccountNotification::class);
+            }
+
+            // Suspicious activity handler
+            if (config('artisanpack.security.notifications.suspicious_activity', true)) {
+                Event::listen(SuspiciousActivityDetected::class, HandleSuspiciousActivity::class);
+            }
+        }
+    }
+
+    /**
+     * Register authentication Livewire components.
+     *
+     * @return void
+     */
+    protected function registerAuthenticationLivewireComponents(): void
+    {
+        if (! class_exists(Livewire::class)) {
+            return;
+        }
+
+        // Social accounts management
+        if (config('artisanpack.security.social_auth.enabled', true)) {
+            Livewire::component('social-accounts-manager', SocialAccountsManager::class);
+        }
+
+        // WebAuthn credentials management
+        if (config('artisanpack.security.webauthn.enabled', true)) {
+            Livewire::component('webauthn-credentials-manager', WebAuthnCredentialsManager::class);
+        }
+
+        // Biometric management
+        if (config('artisanpack.security.biometric.enabled', true)) {
+            Livewire::component('biometric-manager', BiometricManagerComponent::class);
+        }
+
+        // Device management
+        if (config('artisanpack.security.device_fingerprinting.enabled', true)) {
+            Livewire::component('device-manager', DeviceManager::class);
+        }
+
+        // Session management
+        if (config('artisanpack.security.advanced_sessions.enabled', true)) {
+            Livewire::component('session-manager', SessionManager::class);
+        }
+
+        // Suspicious activity list
+        if (config('artisanpack.security.suspicious_activity.enabled', true)) {
+            Livewire::component('suspicious-activity-list', SuspiciousActivityList::class);
+        }
+
+        // Account lockout status
+        if (config('artisanpack.security.account_lockout.enabled', true)) {
+            Livewire::component('account-lockout-status', AccountLockoutStatus::class);
+        }
+
+        // Step-up authentication modal
+        if (config('artisanpack.security.step_up_authentication.enabled', true)) {
+            Livewire::component('step-up-authentication-modal', StepUpAuthenticationModal::class);
         }
     }
 }

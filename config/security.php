@@ -843,5 +843,693 @@ return [
             'maxOverheadPercent' => 15.0,
         ],
     ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Social Authentication (OAuth2/OIDC)
+    |--------------------------------------------------------------------------
+    |
+    | Configure social login providers for OAuth2 and OpenID Connect
+    | authentication. Each provider can be individually enabled/disabled.
+    |
+    */
+    'social_auth' => [
+        'enabled' => env('SECURITY_SOCIAL_AUTH_ENABLED', true),
+
+        /*
+         * Allow users to register via social login.
+         * When false, users must already have an account.
+         */
+        'allow_registration' => env('SECURITY_SOCIAL_REGISTRATION_ENABLED', true),
+
+        /*
+         * Allow users to link multiple social accounts.
+         */
+        'allow_linking' => true,
+
+        /*
+         * Require email verification for social logins.
+         */
+        'require_email_verification' => true,
+
+        /*
+         * Automatically link social accounts to existing users with the same email.
+         */
+        'auto_link_by_email' => true,
+
+        /*
+         * Social authentication providers configuration.
+         */
+        'providers' => [
+            'google' => [
+                'enabled' => env('SOCIAL_GOOGLE_ENABLED', false),
+                'client_id' => env('SOCIAL_GOOGLE_CLIENT_ID'),
+                'client_secret' => env('SOCIAL_GOOGLE_CLIENT_SECRET'),
+                'scopes' => ['openid', 'email', 'profile'],
+            ],
+            'microsoft' => [
+                'enabled' => env('SOCIAL_MICROSOFT_ENABLED', false),
+                'client_id' => env('SOCIAL_MICROSOFT_CLIENT_ID'),
+                'client_secret' => env('SOCIAL_MICROSOFT_CLIENT_SECRET'),
+                'tenant' => env('SOCIAL_MICROSOFT_TENANT', 'common'),
+                'scopes' => ['openid', 'email', 'profile', 'User.Read'],
+            ],
+            'github' => [
+                'enabled' => env('SOCIAL_GITHUB_ENABLED', false),
+                'client_id' => env('SOCIAL_GITHUB_CLIENT_ID'),
+                'client_secret' => env('SOCIAL_GITHUB_CLIENT_SECRET'),
+                'scopes' => ['user:email'],
+            ],
+            'facebook' => [
+                'enabled' => env('SOCIAL_FACEBOOK_ENABLED', false),
+                'client_id' => env('SOCIAL_FACEBOOK_CLIENT_ID'),
+                'client_secret' => env('SOCIAL_FACEBOOK_CLIENT_SECRET'),
+                'scopes' => ['email', 'public_profile'],
+            ],
+            'apple' => [
+                'enabled' => env('SOCIAL_APPLE_ENABLED', false),
+                'client_id' => env('SOCIAL_APPLE_CLIENT_ID'),
+                'team_id' => env('SOCIAL_APPLE_TEAM_ID'),
+                'key_id' => env('SOCIAL_APPLE_KEY_ID'),
+                'private_key_path' => env('SOCIAL_APPLE_PRIVATE_KEY_PATH'),
+                'scopes' => ['name', 'email'],
+            ],
+            'linkedin' => [
+                'enabled' => env('SOCIAL_LINKEDIN_ENABLED', false),
+                'client_id' => env('SOCIAL_LINKEDIN_CLIENT_ID'),
+                'client_secret' => env('SOCIAL_LINKEDIN_CLIENT_SECRET'),
+                'scopes' => ['openid', 'profile', 'email'],
+            ],
+        ],
+
+        /*
+         * Routes configuration.
+         */
+        'routes' => [
+            'enabled' => true,
+            'prefix' => 'auth/social',
+            'middleware' => ['web'],
+        ],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Single Sign-On (SSO)
+    |--------------------------------------------------------------------------
+    |
+    | Configure enterprise SSO using SAML 2.0, OpenID Connect, or LDAP.
+    | SSO configurations are stored in the database for dynamic management.
+    |
+    */
+    'sso' => [
+        'enabled' => env('SECURITY_SSO_ENABLED', true),
+
+        /*
+         * Allow JIT (Just-In-Time) user provisioning from SSO.
+         */
+        'jit_provisioning' => env('SECURITY_SSO_JIT_PROVISIONING', true),
+
+        /*
+         * Default role to assign to JIT-provisioned users.
+         */
+        'default_role' => env('SECURITY_SSO_DEFAULT_ROLE', null),
+
+        /*
+         * SAML 2.0 Service Provider configuration.
+         */
+        'saml' => [
+            'entity_id' => env('SAML_ENTITY_ID', env('APP_URL').'/saml/metadata'),
+            'acs_url' => env('SAML_ACS_URL', env('APP_URL').'/auth/sso/{idp}/acs'),
+            'sls_url' => env('SAML_SLS_URL', env('APP_URL').'/auth/sso/{idp}/sls'),
+            'name_id_format' => 'urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress',
+            'want_assertions_signed' => true,
+            'want_messages_signed' => true,
+            'sp_certificate' => env('SAML_SP_CERTIFICATE_PATH'),
+            'sp_private_key' => env('SAML_SP_PRIVATE_KEY_PATH'),
+        ],
+
+        /*
+         * OIDC client defaults.
+         */
+        'oidc' => [
+            'response_type' => 'code',
+            'scopes' => ['openid', 'email', 'profile'],
+        ],
+
+        /*
+         * LDAP defaults.
+         */
+        'ldap' => [
+            'port' => 389,
+            'use_ssl' => false,
+            'use_tls' => true,
+            'timeout' => 5,
+            'user_dn_format' => 'uid=%s,ou=users,dc=example,dc=com',
+            'user_filter' => '(&(objectClass=person)(uid=%s))',
+            'group_filter' => '(&(objectClass=groupOfNames)(member=%s))',
+        ],
+
+        /*
+         * Routes configuration.
+         */
+        'routes' => [
+            'enabled' => true,
+            'prefix' => 'auth/sso',
+            'middleware' => ['web'],
+        ],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | WebAuthn/FIDO2 Passwordless Authentication
+    |--------------------------------------------------------------------------
+    |
+    | Configure WebAuthn for passwordless authentication using security keys,
+    | platform authenticators (Touch ID, Face ID, Windows Hello), and passkeys.
+    |
+    */
+    'webauthn' => [
+        'enabled' => env('SECURITY_WEBAUTHN_ENABLED', true),
+
+        /*
+         * Relying Party (RP) configuration.
+         */
+        'relying_party' => [
+            'name' => env('WEBAUTHN_RP_NAME', null), // null = use app.name at runtime
+            'id' => env('WEBAUTHN_RP_ID', null), // null = use request host
+            'origin' => env('WEBAUTHN_RP_ORIGIN', null), // null = use request origin
+        ],
+
+        /*
+         * Authenticator selection preferences for registration.
+         */
+        'authenticator_selection' => [
+            /*
+             * Preferred authenticator attachment.
+             * Options: 'platform', 'cross-platform', null (any)
+             */
+            'authenticator_attachment' => null,
+
+            /*
+             * Require resident key (discoverable credential).
+             * Required for passkeys and usernameless authentication.
+             */
+            'resident_key' => 'preferred', // 'required', 'preferred', 'discouraged'
+
+            /*
+             * User verification requirement.
+             * Options: 'required', 'preferred', 'discouraged'
+             */
+            'user_verification' => 'preferred',
+        ],
+
+        /*
+         * Attestation conveyance preference.
+         * Options: 'none', 'indirect', 'direct', 'enterprise'
+         */
+        'attestation' => 'none',
+
+        /*
+         * Supported public key algorithms (COSE identifiers).
+         */
+        'algorithms' => [
+            -7,   // ES256 (ECDSA with P-256 and SHA-256)
+            -257, // RS256 (RSASSA-PKCS1-v1_5 with SHA-256)
+        ],
+
+        /*
+         * Challenge timeout in milliseconds.
+         */
+        'timeout' => 60000, // 60 seconds
+
+        /*
+         * Allow users to register multiple credentials.
+         */
+        'allow_multiple_credentials' => true,
+
+        /*
+         * Maximum number of credentials per user.
+         */
+        'max_credentials_per_user' => 10,
+
+        /*
+         * Routes configuration.
+         */
+        'routes' => [
+            'enabled' => true,
+            'prefix' => 'auth/webauthn',
+            'middleware' => ['web', 'auth'],
+        ],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Biometric Authentication
+    |--------------------------------------------------------------------------
+    |
+    | Configure biometric authentication using platform authenticators
+    | (Touch ID, Face ID, Windows Hello, Android Biometrics).
+    |
+    */
+    'biometric' => [
+        'enabled' => env('SECURITY_BIOMETRIC_ENABLED', true),
+
+        /*
+         * Available biometric providers.
+         */
+        'providers' => [
+            'webauthn' => [
+                'enabled' => true,
+                'driver' => \ArtisanPackUI\Security\Authentication\Biometric\WebAuthnBiometricProvider::class,
+            ],
+        ],
+
+        /*
+         * Default biometric provider.
+         */
+        'default' => 'webauthn',
+
+        /*
+         * Allow biometric as primary authentication method.
+         */
+        'allow_primary_auth' => true,
+
+        /*
+         * Require biometric re-verification for sensitive actions.
+         */
+        'require_for_sensitive_actions' => true,
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Device Fingerprinting
+    |--------------------------------------------------------------------------
+    |
+    | Configure device fingerprinting for tracking and trust management.
+    | Helps detect suspicious activity and new device logins.
+    |
+    */
+    'device_fingerprinting' => [
+        'enabled' => env('SECURITY_DEVICE_FINGERPRINTING_ENABLED', true),
+
+        /*
+         * Components to include in device fingerprint.
+         */
+        'components' => [
+            'user_agent' => true,
+            'accept_language' => true,
+            'accept_encoding' => true,
+            'timezone' => true,
+            'screen_resolution' => true,
+            'color_depth' => true,
+            'platform' => true,
+            'plugins' => false, // Deprecated in modern browsers
+            'canvas' => true,
+            'webgl' => true,
+            'fonts' => false, // Privacy concerns
+        ],
+
+        /*
+         * Trust score thresholds.
+         */
+        'trust_thresholds' => [
+            'suspicious' => 30,  // Below this is suspicious
+            'trusted' => 70,     // Above this is trusted
+        ],
+
+        /*
+         * Auto-trust devices after N successful logins.
+         */
+        'auto_trust_after_logins' => 3,
+
+        /*
+         * Maximum devices per user.
+         */
+        'max_devices_per_user' => 10,
+
+        /*
+         * Device inactivity cleanup (days).
+         */
+        'cleanup_after_days' => 180,
+
+        /*
+         * Notify user on new device detection.
+         */
+        'notify_on_new_device' => true,
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Advanced Session Security
+    |--------------------------------------------------------------------------
+    |
+    | Configure advanced session management with binding, concurrency limits,
+    | rotation policies, and hijacking detection.
+    |
+    */
+    'advanced_sessions' => [
+        'enabled' => env('SECURITY_ADVANCED_SESSIONS_ENABLED', true),
+
+        /*
+         * Session binding configuration.
+         * Bind sessions to specific client attributes.
+         */
+        'binding' => [
+            'enabled' => true,
+            'ip_address' => [
+                'enabled' => true,
+                'strictness' => 'subnet', // 'none', 'subnet', 'exact'
+            ],
+            'user_agent' => [
+                'enabled' => true,
+                'strictness' => 'exact', // 'none', 'browser_only', 'exact'
+            ],
+            'bind_to_device' => true, // Requires device fingerprinting
+        ],
+
+        /*
+         * Concurrent session limits.
+         */
+        'concurrent_sessions' => [
+            'enabled' => true,
+            'max_sessions' => 5,
+            'strategy' => 'oldest', // 'oldest', 'newest'
+        ],
+
+        /*
+         * Session rotation policy.
+         */
+        'rotation' => [
+            'enabled' => true,
+            'interval_minutes' => 15, // Rotate session ID every N minutes
+            'on_privilege_change' => true, // Rotate after login, role change, etc.
+        ],
+
+        /*
+         * Session timeouts.
+         */
+        'timeouts' => [
+            'idle_minutes' => 30,           // Expire after N minutes of inactivity
+            'idle_warning_minutes' => 25,   // Warn user before idle expiration
+            'absolute_minutes' => 480,      // Maximum session lifetime (8 hours)
+            'extend_on_activity' => true,   // Reset idle timeout on activity
+        ],
+
+        /*
+         * Session hijacking detection.
+         */
+        'hijacking_detection' => [
+            'enabled' => true,
+            'action' => 'terminate', // 'terminate', 'require_reauth', 'notify'
+        ],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Suspicious Activity Detection
+    |--------------------------------------------------------------------------
+    |
+    | Configure advanced suspicious activity detection beyond basic rate limiting.
+    | Includes impossible travel detection, behavioral analysis, and risk scoring.
+    |
+    */
+    'suspicious_activity' => [
+        'enabled' => env('SECURITY_SUSPICIOUS_ACTIVITY_ENABLED', true),
+
+        /*
+         * Detection types to enable.
+         */
+        'detectors' => [
+            'impossible_travel' => [
+                'enabled' => true,
+                'max_speed_kmh' => 1000, // Max realistic travel speed
+            ],
+            'brute_force' => [
+                'enabled' => true,
+                'threshold_per_ip' => 10,
+                'threshold_per_user' => 5,
+                'window_minutes' => 15,
+            ],
+            'credential_stuffing' => [
+                'enabled' => true,
+                'unique_users_threshold' => 5, // Same IP trying multiple users
+                'window_minutes' => 10,
+            ],
+            'unusual_location' => [
+                'enabled' => true,
+                'use_geolocation' => true,
+            ],
+            'unusual_device' => [
+                'enabled' => true,
+            ],
+            'unusual_time' => [
+                'enabled' => true,
+                'normal_hours_start' => 6,
+                'normal_hours_end' => 22,
+            ],
+            'rapid_requests' => [
+                'enabled' => true,
+                'threshold' => 100,
+                'window_seconds' => 60,
+            ],
+            'bot_behavior' => [
+                'enabled' => true,
+                'check_user_agent' => true,
+                'check_request_patterns' => true,
+            ],
+        ],
+
+        /*
+         * Risk scoring configuration.
+         */
+        'risk_scoring' => [
+            'weights' => [
+                'impossible_travel' => 40,
+                'brute_force' => 35,
+                'credential_stuffing' => 35,
+                'unusual_location' => 20,
+                'unusual_device' => 15,
+                'unusual_time' => 10,
+                'rapid_requests' => 25,
+                'bot_behavior' => 30,
+            ],
+            'thresholds' => [
+                'low' => 20,
+                'medium' => 40,
+                'high' => 60,
+                'critical' => 80,
+            ],
+        ],
+
+        /*
+         * Actions based on severity.
+         */
+        'actions' => [
+            'low' => 'notify',        // Log and optionally notify
+            'medium' => 'captcha',    // Require CAPTCHA
+            'high' => 'step_up',      // Require re-authentication
+            'critical' => 'block',    // Block the request
+        ],
+
+        /*
+         * Geolocation settings.
+         */
+        'geolocation' => [
+            'enabled' => true,
+            'provider' => 'maxmind', // 'maxmind', 'ip2location', 'ipinfo'
+            'database_path' => storage_path('app/geoip/GeoLite2-City.mmdb'),
+            'cache_results' => true,
+            'cache_ttl' => 86400, // 24 hours
+        ],
+
+        /*
+         * Retention for suspicious activity records.
+         */
+        'retention_days' => 90,
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Account Lockout Policies
+    |--------------------------------------------------------------------------
+    |
+    | Configure account lockout policies for preventing brute force attacks.
+    | Supports progressive lockouts, soft lockouts, and permanent bans.
+    |
+    */
+    'account_lockout' => [
+        'enabled' => env('SECURITY_ACCOUNT_LOCKOUT_ENABLED', true),
+
+        /*
+         * Base lockout configuration.
+         */
+        'max_attempts' => 5,
+        'lockout_duration' => 15, // Minutes
+
+        /*
+         * Progressive lockout multiplier.
+         * Each subsequent lockout increases duration by this factor.
+         */
+        'progressive' => [
+            'enabled' => true,
+            'multiplier' => 2.0,
+            'max_duration' => 1440, // Maximum lockout duration in minutes (24 hours)
+        ],
+
+        /*
+         * Soft lockout (CAPTCHA) settings.
+         * Applied before hard lockout.
+         */
+        'soft_lockout' => [
+            'enabled' => true,
+            'attempts_threshold' => 3, // Require CAPTCHA after N failed attempts
+        ],
+
+        /*
+         * Permanent lockout for severe violations.
+         */
+        'permanent_lockout' => [
+            'enabled' => true,
+            'consecutive_lockouts' => 5, // Lock permanently after N lockouts
+            'require_admin_unlock' => true,
+        ],
+
+        /*
+         * IP-based lockout.
+         */
+        'ip_lockout' => [
+            'enabled' => true,
+            'max_attempts_per_ip' => 20,
+            'lockout_duration' => 60, // Minutes
+        ],
+
+        /*
+         * Notification settings.
+         */
+        'notifications' => [
+            'notify_user' => true,
+            'notify_admin' => true,
+            'admin_threshold' => 'high', // Notify admin on high+ severity
+        ],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Step-Up Authentication
+    |--------------------------------------------------------------------------
+    |
+    | Configure step-up authentication for sensitive actions.
+    | Requires re-authentication after a period of inactivity.
+    |
+    */
+    'step_up_authentication' => [
+        'enabled' => env('SECURITY_STEP_UP_ENABLED', true),
+
+        /*
+         * Timeout in minutes before requiring re-authentication.
+         */
+        'timeout_minutes' => 15,
+
+        /*
+         * Available authentication methods for step-up.
+         */
+        'methods' => [
+            'password' => true,
+            '2fa' => true,
+            'webauthn' => true,
+            'biometric' => true,
+        ],
+
+        /*
+         * Routes that require step-up authentication.
+         */
+        'protected_routes' => [
+            // 'user/security/*',
+            // 'admin/*',
+        ],
+
+        /*
+         * Actions that trigger step-up authentication.
+         */
+        'protected_actions' => [
+            'password_change',
+            'email_change',
+            'two_factor_disable',
+            'delete_account',
+            'download_data',
+        ],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Security Notifications
+    |--------------------------------------------------------------------------
+    |
+    | Configure security-related notifications sent to users and admins.
+    |
+    */
+    'notifications' => [
+        'enabled' => env('SECURITY_NOTIFICATIONS_ENABLED', true),
+
+        /*
+         * Notification toggles.
+         */
+        'new_device_login' => true,
+        'suspicious_activity' => true,
+        'account_locked' => true,
+        'webauthn_credential' => true,
+        'social_account' => true,
+        'session_hijacking' => true,
+
+        /*
+         * SMS notifications for critical events.
+         */
+        'sms_for_critical' => false,
+
+        /*
+         * Admin email addresses for security alerts.
+         */
+        'admin_emails' => env('SECURITY_ADMIN_EMAILS', ''),
+
+        /*
+         * Custom notification classes (optional overrides).
+         */
+        'classes' => [
+            'new_device' => \ArtisanPackUI\Security\Notifications\NewDeviceLogin::class,
+            'suspicious_activity' => \ArtisanPackUI\Security\Notifications\SuspiciousLoginAttempt::class,
+            'account_locked' => \ArtisanPackUI\Security\Notifications\AccountLockedNotification::class,
+            'webauthn_added' => \ArtisanPackUI\Security\Notifications\WebAuthnCredentialAdded::class,
+            'webauthn_removed' => \ArtisanPackUI\Security\Notifications\WebAuthnCredentialRemoved::class,
+            'social_linked' => \ArtisanPackUI\Security\Notifications\SocialAccountLinkedNotification::class,
+            'social_unlinked' => \ArtisanPackUI\Security\Notifications\SocialAccountUnlinkedNotification::class,
+        ],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Authentication Routes
+    |--------------------------------------------------------------------------
+    |
+    | Configure the routes for advanced authentication features.
+    |
+    */
+    'auth_routes' => [
+        'enabled' => env('SECURITY_AUTH_ROUTES_ENABLED', true),
+        'prefix' => 'auth',
+        'middleware' => ['web'],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Logging
+    |--------------------------------------------------------------------------
+    |
+    | Configure security-specific logging.
+    |
+    */
+    'logging' => [
+        'channel' => env('SECURITY_LOG_CHANNEL', 'security'),
+        'level' => env('SECURITY_LOG_LEVEL', 'info'),
+    ],
 ];
     
