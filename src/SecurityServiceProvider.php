@@ -42,6 +42,31 @@ use ArtisanPackUI\Security\Console\Commands\ManageAccountLockout;
 use ArtisanPackUI\Security\Console\Commands\ManageSsoConfiguration;
 use ArtisanPackUI\Security\Console\Commands\PruneSuspiciousActivity;
 use ArtisanPackUI\Security\Console\Commands\TerminateUserSessions;
+use ArtisanPackUI\Security\Console\Commands\GenerateComplianceReport;
+use ArtisanPackUI\Security\Console\Commands\ProcessErasureRequests;
+use ArtisanPackUI\Security\Console\Commands\ProcessPortabilityRequests;
+use ArtisanPackUI\Security\Console\Commands\PurgeExpiredData;
+use ArtisanPackUI\Security\Console\Commands\RunComplianceChecks;
+use ArtisanPackUI\Security\Compliance\Assessment\DpiaService;
+use ArtisanPackUI\Security\Compliance\Assessment\ProcessingActivityService;
+use ArtisanPackUI\Security\Compliance\Assessment\RiskCalculator;
+use ArtisanPackUI\Security\Compliance\Consent\ConsentManager;
+use ArtisanPackUI\Security\Compliance\Consent\ConsentPolicyService;
+use ArtisanPackUI\Security\Compliance\Consent\CookieConsentHandler;
+use ArtisanPackUI\Security\Compliance\Contracts\ComplianceCheckInterface;
+use ArtisanPackUI\Security\Compliance\Contracts\ConsentStorageInterface;
+use ArtisanPackUI\Security\Compliance\Contracts\DataExporterInterface;
+use ArtisanPackUI\Security\Compliance\Contracts\ErasureHandlerInterface;
+use ArtisanPackUI\Security\Compliance\Contracts\ReportTypeInterface;
+use ArtisanPackUI\Security\Compliance\Erasure\ErasureService;
+use ArtisanPackUI\Security\Compliance\Middleware\CheckConsentMiddleware;
+use ArtisanPackUI\Security\Compliance\Middleware\DataMinimizationMiddleware;
+use ArtisanPackUI\Security\Compliance\Minimization\AnonymizationEngine;
+use ArtisanPackUI\Security\Compliance\Minimization\DataMinimizerService;
+use ArtisanPackUI\Security\Compliance\Minimization\PseudonymizationEngine;
+use ArtisanPackUI\Security\Compliance\Monitoring\ComplianceMonitor;
+use ArtisanPackUI\Security\Compliance\Portability\PortabilityService;
+use ArtisanPackUI\Security\Compliance\Reporting\ReportGenerator as ComplianceReportGenerator;
 use ArtisanPackUI\Security\Contracts\BreachCheckerInterface;
 use ArtisanPackUI\Security\Contracts\CspPolicyInterface;
 use ArtisanPackUI\Security\Contracts\FileValidatorInterface;
@@ -232,6 +257,9 @@ class SecurityServiceProvider extends ServiceProvider
 		// Register advanced authentication services
 		$this->registerAdvancedAuthenticationServices();
 
+		// Register compliance services
+		$this->registerComplianceServices();
+
 		$this->mergeConfigFrom(
 			__DIR__ . '/../config/security.php', 'artisanpack-security-temp'
 		);
@@ -342,6 +370,8 @@ class SecurityServiceProvider extends ServiceProvider
         $this->bootAdvancedAuthentication();
 
         $this->bootAnalytics();
+
+        $this->bootCompliance();
 
         Validator::extend('password_policy', function ($attribute, $value, $parameters, $validator) {
             return (new PasswordPolicy)->passes($attribute, $value);
@@ -1378,6 +1408,264 @@ class SecurityServiceProvider extends ServiceProvider
             $service->registerExporter(new \ArtisanPackUI\Security\Analytics\Siem\Exporters\WebhookExporter(
                 $exporterConfigs['webhook']
             ));
+        }
+    }
+
+    /**
+     * Register compliance framework services.
+     *
+     * @return void
+     */
+    protected function registerComplianceServices(): void
+    {
+        // Consent Management
+        $this->app->singleton(ConsentManager::class, function ($app) {
+            return new ConsentManager();
+        });
+
+        $this->app->singleton(ConsentPolicyService::class, function ($app) {
+            return new ConsentPolicyService();
+        });
+
+        $this->app->singleton(CookieConsentHandler::class, function ($app) {
+            return new CookieConsentHandler();
+        });
+
+        // Data Minimization
+        $this->app->singleton(AnonymizationEngine::class, function ($app) {
+            return new AnonymizationEngine();
+        });
+
+        $this->app->singleton(PseudonymizationEngine::class, function ($app) {
+            return new PseudonymizationEngine();
+        });
+
+        $this->app->singleton(DataMinimizerService::class, function ($app) {
+            return new DataMinimizerService(
+                $app->make(AnonymizationEngine::class),
+                $app->make(PseudonymizationEngine::class)
+            );
+        });
+
+        // Erasure Service
+        $this->app->singleton(ErasureService::class, function ($app) {
+            return new ErasureService();
+        });
+
+        // Portability Service
+        $this->app->singleton(PortabilityService::class, function ($app) {
+            return new PortabilityService();
+        });
+
+        // DPIA Assessment
+        $this->app->singleton(RiskCalculator::class, function ($app) {
+            return new RiskCalculator();
+        });
+
+        $this->app->singleton(ProcessingActivityService::class, function ($app) {
+            return new ProcessingActivityService();
+        });
+
+        $this->app->singleton(DpiaService::class, function ($app) {
+            return new DpiaService(
+                $app->make(RiskCalculator::class),
+                $app->make(ProcessingActivityService::class)
+            );
+        });
+
+        // Compliance Monitoring
+        $this->app->singleton(ComplianceMonitor::class, function ($app) {
+            return new ComplianceMonitor();
+        });
+
+        // Compliance Reporting
+        $this->app->singleton(ComplianceReportGenerator::class, function ($app) {
+            return new ComplianceReportGenerator();
+        });
+
+        // Merge compliance configuration
+        $this->mergeConfigFrom(
+            __DIR__ . '/../config/security-compliance.php', 'security-compliance'
+        );
+    }
+
+    /**
+     * Boot the compliance framework services.
+     *
+     * @return void
+     */
+    protected function bootCompliance(): void
+    {
+        if (! config('security-compliance.enabled', true)) {
+            return;
+        }
+
+        // Load compliance migrations
+        $this->loadMigrationsFrom(__DIR__ . '/../database/migrations/compliance');
+
+        // Register compliance middleware
+        $this->registerComplianceMiddleware();
+
+        // Register console commands
+        if ($this->app->runningInConsole()) {
+            $this->commands([
+                RunComplianceChecks::class,
+                ProcessErasureRequests::class,
+                ProcessPortabilityRequests::class,
+                PurgeExpiredData::class,
+                GenerateComplianceReport::class,
+            ]);
+
+            // Publish compliance config
+            $this->publishes([
+                __DIR__ . '/../config/security-compliance.php' => config_path('security-compliance.php'),
+            ], 'artisanpack-compliance-config');
+        }
+
+        // Register compliance event listeners
+        $this->registerComplianceEventListeners();
+
+        // Load compliance routes if enabled
+        if (config('security-compliance.routes.enabled', true)) {
+            $this->loadRoutesFrom(__DIR__ . '/../routes/compliance.php');
+        }
+
+        // Register default gate for compliance dashboard access
+        $this->registerComplianceDashboardGate();
+    }
+
+    /**
+     * Register compliance middleware aliases.
+     *
+     * @return void
+     */
+    protected function registerComplianceMiddleware(): void
+    {
+        $router = $this->app['router'];
+
+        // Consent check middleware
+        if (config('security-compliance.compliance.consent.enabled', true)) {
+            $router->aliasMiddleware('check.consent', CheckConsentMiddleware::class);
+        }
+
+        // Data minimization middleware
+        if (config('security-compliance.compliance.minimization.enabled', true)) {
+            $router->aliasMiddleware('data.minimization', DataMinimizationMiddleware::class);
+        }
+    }
+
+    /**
+     * Register compliance event listeners.
+     *
+     * @return void
+     */
+    protected function registerComplianceEventListeners(): void
+    {
+        // Consent events
+        Event::listen(
+            \ArtisanPackUI\Security\Events\ConsentGranted::class,
+            function ($event) {
+                Log::info('Consent granted', [
+                    'user_id' => $event->consentRecord->user_id,
+                    'policy_id' => $event->consentRecord->consent_policy_id,
+                ]);
+            }
+        );
+
+        Event::listen(
+            \ArtisanPackUI\Security\Events\ConsentWithdrawn::class,
+            function ($event) {
+                Log::info('Consent withdrawn', [
+                    'user_id' => $event->consentRecord->user_id,
+                    'policy_id' => $event->consentRecord->consent_policy_id,
+                ]);
+            }
+        );
+
+        // Erasure events
+        Event::listen(
+            \ArtisanPackUI\Security\Events\ErasureRequested::class,
+            function ($event) {
+                Log::info('Erasure requested', [
+                    'request_number' => $event->request->request_number,
+                    'user_id' => $event->request->user_id,
+                ]);
+            }
+        );
+
+        Event::listen(
+            \ArtisanPackUI\Security\Events\ErasureCompleted::class,
+            function ($event) {
+                Log::info('Erasure completed', [
+                    'request_number' => $event->request->request_number,
+                    'user_id' => $event->request->user_id,
+                ]);
+            }
+        );
+
+        // Data export events
+        Event::listen(
+            \ArtisanPackUI\Security\Events\DataExportRequested::class,
+            function ($event) {
+                Log::info('Data export requested', [
+                    'request_number' => $event->request->request_number,
+                    'user_id' => $event->request->user_id,
+                ]);
+            }
+        );
+
+        Event::listen(
+            \ArtisanPackUI\Security\Events\DataExportCompleted::class,
+            function ($event) {
+                Log::info('Data export completed', [
+                    'request_number' => $event->request->request_number,
+                    'user_id' => $event->request->user_id,
+                ]);
+            }
+        );
+
+        // Compliance check events
+        Event::listen(
+            \ArtisanPackUI\Security\Events\ComplianceCheckCompleted::class,
+            function ($event) {
+                if (! $event->result->passed) {
+                    Log::warning('Compliance check failed', [
+                        'check' => $event->result->checkName,
+                        'message' => $event->result->message,
+                    ]);
+                }
+            }
+        );
+
+        // Compliance violation events
+        Event::listen(
+            \ArtisanPackUI\Security\Events\ComplianceViolationDetected::class,
+            function ($event) {
+                Log::error('Compliance violation detected', [
+                    'violation_number' => $event->violation->violation_number,
+                    'severity' => $event->violation->severity,
+                    'category' => $event->violation->category,
+                    'title' => $event->violation->title,
+                ]);
+            }
+        );
+    }
+
+    /**
+     * Register the default gate for compliance dashboard access.
+     *
+     * @return void
+     */
+    protected function registerComplianceDashboardGate(): void
+    {
+        // Only define if not already defined by the application
+        if (! Gate::has('viewComplianceDashboard')) {
+            Gate::define('viewComplianceDashboard', function ($user) {
+                // Default: deny access. Applications should define their own gate.
+                // Example in AuthServiceProvider:
+                //   Gate::define('viewComplianceDashboard', fn ($user) => $user->hasRole('compliance-officer'));
+                return false;
+            });
         }
     }
 }
