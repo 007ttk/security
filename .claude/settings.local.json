@@ -9,7 +9,10 @@
       "Bash(git fetch:*)",
       "Bash(xargs git branch -D)",
       "Bash(grep:*)",
-      "Bash(composer dump-autoload:*)"
+      "Bash(composer dump-autoload:*)",
+      "Bash(find:*)",
+      "Bash(cat:*)",
+      "Bash(xargs:*)"
     ],
     "deny": [],
     "ask": []
