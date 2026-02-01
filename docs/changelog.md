@@ -97,7 +97,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## Security Updates
 
-Security vulnerabilities are addressed as quickly as possible. If you discover a security issue, please report it responsibly by following our [security reporting guidelines](contributing#security-contributions).
+Security vulnerabilities are addressed as quickly as possible. If you discover a security issue, please report it responsibly by following our [security reporting guidelines](Contributing#security-contributions).
 
 ## Upgrade Guides
 
@@ -124,4 +124,4 @@ Planned features for future releases:
 
 ## Contributing
 
-See our [Contributing Guide](contributing) for information on how to contribute to this changelog and the project overall.
+See our [Contributing Guide](Contributing) for information on how to contribute to this changelog and the project overall.

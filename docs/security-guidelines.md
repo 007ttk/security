@@ -302,4 +302,4 @@ If you discover a security vulnerability:
 - [Laravel Security Best Practices](https://laravel.com/docs/security)
 - [PHP Security Guidelines](https://www.php.net/manual/en/security.php)
 
-For AI-specific security guidelines, see [AI Guidelines](ai-guidelines).
+For AI-specific security guidelines, see [AI Guidelines](Ai-Guidelines).

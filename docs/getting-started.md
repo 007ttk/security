@@ -100,6 +100,6 @@ $safeHtml = kses($userHtml);
 
 ## Next Steps
 
-- Explore the complete [API Reference](api-reference) for detailed function documentation
-- Read the [Security Guidelines](security-guidelines) for advanced security practices
-- Check out the [AI Guidelines](ai-guidelines) if you're using AI code generation
+- Explore the complete [API Reference](Api-Reference) for detailed function documentation
+- Read the [Security Guidelines](Security-Guidelines) for advanced security practices
+- Check out the [AI Guidelines](Ai-Guidelines) if you're using AI code generation
